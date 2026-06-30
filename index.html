@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Varnish Artifact Firewall</title>
-<meta name="description" content="Block malicious npm, PyPI, Maven, and NuGet packages at request time, before they ever reach your build.">
+<meta name="description" content="Block malicious npm, PyPI, Maven, and NuGet packages at request time, before they are ever installed.">
 <meta name="robots" content="noindex, nofollow">
 <meta name="theme-color" content="#0B142E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -310,8 +310,8 @@
 <div class="hero">
   <div class="wrap">
     <div class="eyebrow">Varnish Artifact Firewall</div>
-    <h1>Block malicious packages <em>before</em> they enter your build pipeline</h1>
-    <p class="lead">A security gate that enforces policy for every software dependency pulled into your build, at request time.</p>
+    <h1>Block malicious packages <em>before</em> they reach your developers, pipelines, or agents</h1>
+    <p class="lead">A security gate that enforces policy on every dependency you pull, at request time.</p>
     <p class="hero-context">Protect your software supply chain against modern attacks, from Axios and TanStack to the self-replicating Shai-Hulud and Miasma worms now reaching trusted packages and AI coding agents.</p>
     <div class="btn-row">
       <a href="#cta" class="btn btn-primary">Book a meeting</a>
@@ -327,7 +327,7 @@
     <div class="section-head center">
       <div class="eyebrow">Why Artifact Firewall</div>
       <h2>Block the known. Quarantine the unknown.</h2>
-      <p>Scanners like JFrog Xray catch vulnerabilities only after dependencies are pulled in. Too late. Artifact Firewall enforces policy the moment a package is requested, blocking malware and vulnerable versions before they reach your build, across npm, PyPI, Maven, and NuGet.</p>
+      <p>Scanners like JFrog Xray only catch vulnerabilities after dependencies are pulled in, by which point it is too late. Artifact Firewall enforces policy the moment a package is requested, stopping malware and vulnerable versions before they are installed, across npm, PyPI, Maven, and NuGet.</p>
     </div>
     <div class="triad-grid">
       <div>
@@ -373,7 +373,7 @@
   <div class="wrap">
     <div class="lead-row">
       <h2>One policy layer in front of the registries you already run</h2>
-      <p class="note">Artifact Firewall enforces in the request path, so your existing registries, repository managers, and package clients work unchanged, not in place of them.</p>
+      <p class="note">Artifact Firewall enforces in the request path, so your existing registries, repository managers, and package clients keep working unchanged. It adds a policy layer in front of your stack, rather than replacing any of it.</p>
     </div>
     <div class="pill-group">
       <div class="glabel">Repository managers</div>
