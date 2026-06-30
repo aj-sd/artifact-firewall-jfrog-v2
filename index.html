@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Varnish Artifact Firewall</title>
+<meta name="description" content="Block malicious npm, PyPI, Maven, and NuGet packages at request time, before they ever reach your build.">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#0B142E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500&family=Lora:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    /* Hero blue */
+    --blue-10:#E5F2FF;
+    --blue-20:#B2D9FF;
+    --blue-30:#66BAFF;
+    --blue-40:#33A3FF;
+    --blue-50:#008CFF;   /* core / brand interaction */
+    --blue-60:#0763ED;
+    --blue-70:#0D51B8;
+    --blue-80:#0B418C;
+    --blue-90:#0D2363;
+    --blue-100:#0B142E;  /* darkest navy */
+    /* secondary accents */
+    --teal-50:#00BECC;
+    --lime-50:#B4E52E;
+    --purple-50:#594DFF;
+    /* neutrals */
+    --white:#FFFFFF;
+    --gray-05:#FAFAFA;
+    --gray-10:#F7F7F7;
+    --gray-20:#F0F0F0;
+    --gray-30:#E1E2E3;
+    --gray-50:#949AA2;
+    --gray-70:#4E5157;
+    --gray-80:#383B40;
+    --gray-85:#25272A;
+    /* functional */
+    --warn-red:#DA1E28;
+    --warn-orange:#D67D41;
+    --success:#12B982;
+    /* roles */
+    --ink:var(--blue-100);
+    --body:#3f4a5a;
+    --muted:#6b7888;
+    --line:#E1E2E3;
+    --bg:#ffffff;
+    --bg-soft:#F7FAFC;
+    --maxw:1120px;
+    --serif:"Lora",Georgia,"Times New Roman",serif;       /* Tiempos Headline stand-in */
+    --sans:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; /* Varnish Sans */
+    --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;  /* Varnish Mono */
+  }
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{margin:0;font-family:var(--sans);color:var(--body);background:var(--bg);
+    line-height:1.65;-webkit-font-smoothing:antialiased;font-size:16px;}
+  a{color:var(--blue-60);text-decoration:none;}
+  a:hover{text-decoration:underline;}
+  .wrap{max-width:var(--maxw);margin:0 auto;padding:0 28px;}
+  h1,h2,h3{font-family:var(--serif);font-weight:500;color:var(--ink);letter-spacing:-.01em;}
+
+  /* draft banner */
+  .draft{background:#FFF7E6;color:#8a6d1a;text-align:center;font-size:12.5px;
+    padding:7px 14px;border-bottom:1px solid #F0E3BF;font-family:var(--mono);letter-spacing:.2px;}
+
+  /* eyebrow (mono accent) */
+  .eyebrow{font-family:var(--mono);color:var(--blue-60);font-size:12px;font-weight:500;
+    letter-spacing:2px;text-transform:uppercase;margin-bottom:18px;}
+
+  /* header */
+  header{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.88);
+    backdrop-filter:saturate(180%) blur(10px);border-bottom:1px solid var(--line);}
+  header .wrap{display:flex;align-items:center;justify-content:space-between;padding:16px 28px;}
+  .brand{display:flex;align-items:center;gap:13px;font-weight:700;color:var(--ink);font-size:17px;letter-spacing:-.01em;}
+  .brand .mark{display:flex;gap:5px;align-items:center;}
+  .brand .mark span{width:11px;height:11px;border-radius:50%;display:block;}
+  .brand .mark span:nth-child(1){background:var(--blue-50);}
+  .brand .mark span:nth-child(2){background:var(--blue-60);}
+  .brand .mark span:nth-child(3){background:var(--blue-80);}
+  .brand .divider{width:1px;height:20px;background:var(--gray-30);margin:0 3px;}
+  .brand .suffix{font-weight:500;color:var(--gray-70);letter-spacing:-.02em;}
+  nav.top{display:flex;gap:26px;align-items:center;}
+  nav.top a{color:var(--gray-70);font-size:14.5px;font-weight:500;}
+  nav.top a:hover{color:var(--ink);text-decoration:none;}
+
+  /* buttons */
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;
+    font-family:var(--sans);font-weight:600;font-size:15px;padding:13px 24px;
+    border-radius:8px;border:1px solid transparent;cursor:pointer;transition:all .15s ease;}
+  .btn:hover{text-decoration:none;}
+  .btn-primary{background:var(--blue-50);color:#fff;}
+  .btn-primary:hover{background:var(--blue-60);}
+  .btn-sm{padding:10px 18px;font-size:14px;}
+  .btn-outline{background:transparent;color:#fff;border-color:rgba(255,255,255,.4);}
+  .btn-outline:hover{background:rgba(255,255,255,.1);border-color:#fff;}
+  .btn-ghost{background:transparent;color:var(--blue-60);border-color:var(--gray-30);}
+  .btn-ghost:hover{background:var(--blue-10);border-color:var(--blue-30);}
+  .btn-dark{background:var(--ink);color:#fff;}
+  .btn-dark:hover{background:var(--blue-90);}
+  .btn-row{display:flex;gap:14px;flex-wrap:wrap;justify-content:center;}
+
+  /* hero */
+  .hero{position:relative;text-align:center;padding:96px 0 80px;overflow:hidden;
+    background:radial-gradient(900px 460px at 50% -8%,var(--blue-10),transparent 70%);}
+  .hero h1{font-size:58px;line-height:1.06;margin:0 auto 22px;max-width:880px;font-weight:500;}
+  .hero h1 em{font-style:normal;color:var(--blue-60);}
+  .hero .lead{font-size:21px;color:var(--gray-70);max-width:720px;margin:0 auto 34px;
+    line-height:1.55;text-wrap:balance;}
+  .hero .btn-row{margin-bottom:26px;}
+  .hero-context{font-size:16px;color:var(--muted);max-width:660px;margin:-8px auto 32px;line-height:1.55;}
+  .trust{font-family:var(--mono);font-size:12.5px;color:var(--blue-60);letter-spacing:.2px;margin:0;font-style:normal;}
+  .meta-line{font-family:var(--mono);font-size:12.5px;color:var(--muted);letter-spacing:.3px;}
+
+  /* yellow confirm highlight — claims pending product-owner sign-off */
+  .confirm{background:#FFF3C4;box-shadow:0 0 0 2px #FFF3C4;border-radius:2px;}
+
+  /* actions triad — block / quarantine / serve */
+  .triad{background:#fff;}
+  .triad-grid{display:grid;grid-template-columns:1fr 1.3fr;gap:64px;align-items:center;}
+  .triad .stat{font-family:var(--serif);font-size:96px;line-height:.9;color:var(--ink);font-weight:500;letter-spacing:-.03em;}
+  .triad .stat-cap{font-size:16px;color:var(--gray-70);margin-top:14px;max-width:280px;}
+  .actions{list-style:none;margin:0;padding:0;border-left:1px solid var(--line);}
+  .actions li{display:flex;align-items:flex-start;gap:16px;padding:0 0 26px 28px;}
+  .actions li:last-child{padding-bottom:0;}
+  .actions .badge{flex:none;width:40px;height:40px;border-radius:10px;display:flex;align-items:center;
+    justify-content:center;background:var(--blue-10);color:var(--blue-60);}
+  .actions .badge svg{width:20px;height:20px;}
+  .actions .label{font-family:var(--mono);font-size:12px;letter-spacing:1.5px;text-transform:uppercase;color:var(--blue-60);}
+  .actions .what{color:var(--ink);font-weight:700;font-size:17px;margin-top:2px;}
+  .actions .desc{color:var(--gray-70);font-size:14.5px;margin-top:3px;}
+
+  /* neutrality meta line in hero */
+  .neutral-line{font-family:var(--mono);font-size:12.5px;color:var(--muted);letter-spacing:.3px;margin:14px 0 0;}
+  .neutral-line span{margin:0 9px;}
+
+  /* registry strip */
+  .registries{background:var(--bg-soft);border-top:1px solid var(--line);border-bottom:1px solid var(--line);}
+  .registries .lead-row{display:flex;align-items:baseline;justify-content:space-between;gap:24px;flex-wrap:wrap;margin-bottom:26px;}
+  .registries h2{font-size:28px;margin:0;max-width:560px;}
+  .registries .note{font-size:14.5px;color:var(--gray-70);max-width:340px;margin:0;}
+  .pills{display:flex;flex-wrap:wrap;gap:10px;}
+  .pill{font-family:var(--sans);font-size:14px;font-weight:600;color:var(--ink);background:#fff;
+    border:1px solid var(--line);border-radius:999px;padding:9px 16px;display:inline-flex;align-items:center;gap:8px;}
+  .pill::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--blue-40);}
+  .pill.key{border-color:var(--blue-30);background:var(--blue-10);}
+  .pill.key::before{background:var(--blue-60);}
+  /* labeled pill groups */
+  .pill-group{display:flex;align-items:flex-start;gap:24px;padding:18px 0;border-top:1px solid var(--line);}
+  .pill-group:first-child{border-top:0;padding-top:4px;}
+  .pill-group .glabel{flex:none;width:168px;font-family:var(--mono);font-size:11px;letter-spacing:1.2px;
+    text-transform:uppercase;color:var(--muted);padding-top:10px;}
+  .pill-group .pills{flex:1;}
+  .pill.cmd{font-family:var(--mono);font-weight:500;font-size:13.5px;color:var(--gray-80);}
+  .pill.cmd::before{display:none;}
+  @media(max-width:680px){
+    .pill-group{flex-direction:column;gap:10px;}
+    .pill-group .glabel{width:auto;padding-top:0;}
+  }
+
+  /* JFrog contrast */
+  .contrast .section-head{margin-bottom:36px;}
+  .vs{display:grid;grid-template-columns:1fr 1fr;gap:24px;}
+  .vs-card{border-radius:16px;padding:30px 28px;border:1px solid var(--line);}
+  .vs-card.locked{background:var(--gray-10);}
+  .vs-card.neutral{background:var(--blue-100);color:#cdd9e4;border-color:transparent;}
+  .vs-card .vs-tag{font-family:var(--mono);font-size:11px;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:6px;}
+  .vs-card.locked .vs-tag{color:var(--gray-60);}
+  .vs-card.neutral .vs-tag{color:var(--blue-30);}
+  .vs-card h3{font-family:var(--sans);font-weight:700;font-size:20px;margin:0 0 18px;letter-spacing:-.01em;}
+  .vs-card.locked h3{color:var(--gray-80);}
+  .vs-card.neutral h3{color:#fff;}
+  .vs-list{list-style:none;margin:0;padding:0;display:grid;gap:14px;}
+  .vs-list li{display:flex;gap:11px;font-size:15px;line-height:1.5;}
+  .vs-list .mk{flex:none;width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+    font-size:12px;font-weight:800;margin-top:1px;}
+  .vs-card.locked .vs-list li{color:var(--gray-70);}
+  .vs-card.locked .mk{background:var(--gray-30);color:var(--gray-70);}
+  .vs-card.neutral .vs-list li{color:#c2cfdc;}
+  .vs-card.neutral .mk{background:rgba(0,140,255,.18);color:var(--blue-30);}
+  .vs-card.neutral .vs-list strong{color:#fff;font-weight:600;}
+  .contrast .confirm{color:var(--gray-85);}
+  .meta-line span{margin:0 10px;}
+
+  /* section scaffolding */
+  section{padding:84px 0;}
+  .section-head{max-width:760px;margin:0 0 48px;}
+  .section-head.center{margin-left:auto;margin-right:auto;text-align:center;}
+  .section-head h2{font-size:38px;line-height:1.12;margin:0 0 16px;}
+  .section-head p{font-size:18px;color:var(--gray-70);margin:0;line-height:1.6;}
+
+  /* video / walkthrough — dark panel */
+  .walkthrough{background:var(--blue-100);color:#cdd9e4;}
+  .walkthrough .eyebrow{color:var(--blue-30);}
+  .walkthrough h2{color:#fff;}
+  .wt-grid{display:grid;grid-template-columns:1fr 1fr;gap:56px;align-items:center;}
+  .wt-copy h2{font-size:34px;line-height:1.14;margin:0 0 24px;}
+  .flow-list{list-style:none;margin:0 0 28px;padding:0;display:grid;gap:16px;}
+  .flow-list li{position:relative;padding-left:30px;font-size:15.5px;color:#b9c6d4;line-height:1.55;}
+  .flow-list li::before{content:"";position:absolute;left:0;top:7px;width:14px;height:14px;
+    border-radius:50%;border:2px solid var(--blue-40);}
+  .flow-list strong{color:#fff;font-weight:600;}
+  .run-block{border-top:1px solid rgba(255,255,255,.12);padding-top:24px;margin-top:4px;}
+  .run-block p{font-size:15px;color:#b9c6d4;margin:0 0 16px;}
+  .run-block strong{color:#fff;}
+  /* player */
+  .player .thumb{position:relative;display:block;border-radius:14px;overflow:hidden;
+    aspect-ratio:16/9;background:linear-gradient(135deg,#0d2034,#16324a);
+    border:1px solid rgba(255,255,255,.12);box-shadow:0 24px 60px rgba(0,0,0,.4);}
+  .thumb::after{content:"";position:absolute;inset:0;z-index:1;
+    background:linear-gradient(180deg,rgba(11,20,46,.05),rgba(11,20,46,.45));}
+  .thumb img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;}
+  .thumb iframe{position:absolute;inset:0;width:100%;height:100%;border:0;}
+  .thumb .play{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+    width:76px;height:76px;border-radius:50%;background:var(--blue-50);color:#fff;
+    display:flex;align-items:center;justify-content:center;font-size:24px;padding-left:6px;
+    box-shadow:0 10px 36px rgba(0,140,255,.5);transition:transform .15s ease;z-index:2;}
+  .thumb:hover .play{transform:translate(-50%,-50%) scale(1.08);}
+  .thumb .cap{position:absolute;bottom:16px;left:18px;color:#9fb1c2;font-family:var(--mono);
+    font-size:11.5px;letter-spacing:.3px;z-index:2;}
+
+  /* benefits */
+  .benefits{background:var(--bg-soft);}
+  .bgrid{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line);
+    border:1px solid var(--line);border-radius:16px;overflow:hidden;}
+  .benefit{background:#fff;padding:34px 32px;}
+  .benefit .num{font-family:var(--mono);font-size:12px;color:var(--blue-50);
+    letter-spacing:1px;margin-bottom:16px;}
+  .benefit .ico{width:46px;height:46px;border-radius:11px;background:var(--blue-10);
+    color:var(--blue-60);display:flex;align-items:center;justify-content:center;margin-bottom:18px;}
+  .benefit .ico svg{width:24px;height:24px;}
+  .benefit h3{font-size:20px;margin:0 0 10px;font-family:var(--sans);font-weight:700;letter-spacing:-.01em;}
+  .benefit p{margin:0;font-size:15.5px;color:var(--gray-70);line-height:1.6;}
+
+  /* two layers strip */
+  .strip{background:#fff;}
+  .layers{display:grid;grid-template-columns:1fr auto 1fr;gap:28px;align-items:stretch;}
+  .layer-card{border:1px solid var(--line);border-radius:14px;padding:30px 28px;background:var(--gray-05);}
+  .layer-card .tag{font-family:var(--mono);font-size:11px;letter-spacing:1.5px;text-transform:uppercase;
+    color:var(--blue-60);margin-bottom:12px;}
+  .layer-card h3{font-size:19px;margin:0 0 10px;font-family:var(--sans);font-weight:700;}
+  .layer-card p{margin:0;font-size:14.5px;color:var(--gray-70);}
+  .layer-join{display:flex;align-items:center;justify-content:center;color:var(--blue-40);font-size:26px;}
+
+  /* CTA band */
+  .ctaband{background:var(--blue-100);color:#fff;text-align:center;
+    background:linear-gradient(160deg,var(--blue-100),#10234a);}
+  .ctaband h2{color:#fff;font-size:40px;margin:0 0 18px;line-height:1.1;}
+  .ctaband p{color:#aebccb;max-width:600px;margin:0 auto 32px;font-size:18px;line-height:1.6;}
+
+  /* help links */
+  .help .links{display:grid;grid-template-columns:1fr 1fr;gap:18px;}
+  .linkcard{display:flex;flex-direction:column;gap:6px;border:1px solid var(--line);
+    border-radius:12px;padding:22px 24px;color:var(--ink);transition:all .15s ease;background:#fff;}
+  .linkcard:hover{border-color:var(--blue-30);box-shadow:0 8px 28px rgba(11,20,46,.07);
+    text-decoration:none;transform:translateY(-2px);}
+  .linkcard strong{font-size:16px;font-weight:700;display:flex;align-items:center;gap:8px;}
+  .linkcard span{color:var(--muted);font-size:14px;}
+  .linkcard .arr{color:var(--blue-50);}
+
+  /* footer */
+  footer{background:var(--blue-100);color:#7c8ba0;padding:40px 0;font-size:13px;}
+  footer .wrap{display:flex;justify-content:space-between;align-items:center;gap:20px;flex-wrap:wrap;}
+  footer .brand{color:#fff;}
+  footer .brand .suffix{color:#9fb1c2;}
+  footer .tagline{font-family:var(--mono);font-size:11.5px;color:#7c8ba0;letter-spacing:.3px;}
+
+  @media(max-width:900px){
+    .wt-grid{grid-template-columns:1fr;gap:36px;}
+    .layers{grid-template-columns:1fr;}
+    .layer-join{transform:rotate(90deg);}
+  }
+  @media(max-width:680px){
+    nav.top{display:none;}
+    .hero{padding:64px 0 56px;}
+    .hero h1{font-size:38px;}
+    .hero .lead{font-size:18px;}
+    .section-head h2{font-size:30px;}
+    .bgrid,.help .links{grid-template-columns:1fr;}
+    section{padding:60px 0;}
+    footer .wrap{flex-direction:column;text-align:center;}
+  }
+</style>
+</head>
+<body>
+
+<div class="draft">DRAFT FOR INTERNAL REVIEW — Varnish Artifact Firewall landing page</div>
+
+<!-- HEADER -->
+<header>
+  <div class="wrap">
+    <div class="brand">
+      <span class="mark"><span></span><span></span><span></span></span>
+      Varnish
+      <span class="divider"></span>
+      <span class="suffix">Artifact Firewall</span>
+    </div>
+    <nav class="top">
+      <a href="#walkthrough">Walkthrough</a>
+      <a href="#why">Why Artifact Firewall</a>
+      <a href="#jfrog">Coming from JFrog</a>
+      <a href="#cta" class="btn btn-primary btn-sm">Book a meeting</a>
+    </nav>
+  </div>
+</header>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="wrap">
+    <div class="eyebrow">Varnish Artifact Firewall</div>
+    <h1>Block malicious packages <em>before</em> they enter your build pipeline</h1>
+    <p class="lead">A security gate that enforces policy for every software dependency pulled into your build, at request time.</p>
+    <p class="hero-context">Protect your software supply chain against modern attacks, from Axios and TanStack to the self-replicating Shai-Hulud and Miasma worms now reaching trusted packages and AI coding agents.</p>
+    <div class="btn-row">
+      <a href="#cta" class="btn btn-primary">Book a meeting</a>
+      <a href="#walkthrough" class="btn btn-ghost">Watch the walkthrough</a>
+    </div>
+    <p class="neutral-line"><span>Vendor-neutral</span>·<span>Works with your registries</span>·<span>No platform lock-in</span></p>
+  </div>
+</div>
+
+<!-- WHY / WHAT IT DOES (merged) -->
+<section class="triad" id="why">
+  <div class="wrap">
+    <div class="section-head center">
+      <div class="eyebrow">Why Artifact Firewall</div>
+      <h2>Block the known. Quarantine the unknown.</h2>
+      <p>Scanners like JFrog Xray catch vulnerabilities only after dependencies are pulled in. Too late. Artifact Firewall enforces policy the moment a package is requested, blocking malware and vulnerable versions before they reach your build, across npm, PyPI, Maven, and NuGet.</p>
+    </div>
+    <div class="triad-grid">
+      <div>
+        <div class="stat">100%</div>
+        <div class="stat-cap">of package requests evaluated before they are served</div>
+      </div>
+      <ul class="actions">
+        <li>
+          <span class="badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/></svg></span>
+          <div><div class="label">Block</div><div class="what">Known risks</div><div class="desc">Deny versions matched by OSV intelligence or your own rules, returning a clear policy reason.</div></div>
+        </li>
+        <li>
+          <span class="badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg></span>
+          <div><div class="label">Hide</div><div class="what">Risky versions</div><div class="desc">Demote risky versions, such as medium-severity ones, so they no longer count as latest. The latest becomes the latest approved version, while a pinned version still installs.</div></div>
+        </li>
+        <li>
+          <span class="badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></span>
+          <div><div class="label">Quarantine</div><div class="what">Unknown packages</div><div class="desc">Hold brand-new versions for a configurable window, long enough for the community to flag malicious uploads.</div></div>
+        </li>
+        <li>
+          <span class="badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
+          <div><div class="label">Serve</div><div class="what">Approved packages</div><div class="desc">Pass approved versions straight through, so builds resolve to a safe release.</div></div>
+        </li>
+      </ul>
+    </div>
+    <div class="bgrid" style="margin-top:56px;">
+      <div class="benefit">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg></div>
+        <h3>Frictionless for developers</h3>
+        <p>Risky versions are hidden and safe, approved ones served in their place, so existing workflows keep running without failing builds.</p>
+      </div>
+      <div class="benefit">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 12l2 2 4-4"/><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+        <h3>Compliance &amp; governance</h3>
+        <p>Namespace isolation, time-based quarantine windows, and policy-as-code give you the controls the EU Cyber Resilience Act and corporate auditors expect.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- REGISTRY STRIP -->
+<section class="registries">
+  <div class="wrap">
+    <div class="lead-row">
+      <h2>One policy layer in front of the registries you already run</h2>
+      <p class="note">Artifact Firewall enforces in the request path, so your existing registries, repository managers, and package clients work unchanged, not in place of them.</p>
+    </div>
+    <div class="pill-group">
+      <div class="glabel">Repository managers</div>
+      <div class="pills">
+        <span class="pill key">JFrog Artifactory</span>
+        <span class="pill key">Sonatype Nexus</span>
+        <span class="pill">Cloudsmith</span>
+        <span class="pill">GitHub Packages</span>
+        <span class="pill">GitLab Package Registry</span>
+      </div>
+    </div>
+    <div class="pill-group">
+      <div class="glabel">Public registries</div>
+      <div class="pills">
+        <span class="pill">npm Registry</span>
+        <span class="pill">PyPI</span>
+        <span class="pill">Maven Central</span>
+        <span class="pill">NuGet Gallery</span>
+      </div>
+    </div>
+    <div class="pill-group">
+      <div class="glabel">Developer tooling</div>
+      <div class="pills">
+        <span class="pill cmd">npm</span>
+        <span class="pill cmd">yarn</span>
+        <span class="pill cmd">pnpm</span>
+        <span class="pill cmd">pip</span>
+        <span class="pill cmd">uv</span>
+        <span class="pill cmd">dotnet</span>
+        <span class="pill cmd">mvn</span>
+        <span class="pill cmd">gradle</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- WALKTHROUGH (dark) -->
+<section class="walkthrough" id="walkthrough">
+  <div class="wrap">
+    <div class="wt-grid">
+      <div class="wt-copy">
+        <div class="eyebrow">Video walkthrough</div>
+        <h2>Signed, verified &amp; still dangerous</h2>
+        <p style="color:#b9c6d4;margin:0 0 22px;">Watch the walkthrough to see:</p>
+        <ul class="flow-list">
+          <li><strong>Threats and attacks:</strong> how attackers infect trusted packages by abusing release paths, from Axios and TanStack to GitHub Actions pwn requests.</li>
+          <li><strong>Configuration:</strong> write YAML firewall policy and enforce auto-generated OSV rules with severity thresholds.</li>
+          <li><strong>Policy enforcement:</strong> the difference between allowing, denying, and hiding at request time, and how the quarantine window holds brand-new versions, across npm, PyPI, Maven, and NuGet.</li>
+          <li><strong>Observability:</strong> every decision the firewall makes, through audit logs, Prometheus metrics, and OpenTelemetry signals.</li>
+        </ul>
+        <div class="run-block">
+          <p><strong>Try it out yourself.</strong><br>Follow the docs to install, configure, and run Varnish Artifact Firewall in front of the registries you already run.</p>
+          <div class="btn-row" style="justify-content:flex-start;">
+            <a href="https://www.varnish-software.com/orca/docs/tutorials/" target="_blank" rel="noopener" class="btn btn-primary btn-sm">Step-by-step tutorial →</a>
+            <a href="https://www.varnish-software.com/orca/docs/tutorials/artifact-firewall-getting-started/" target="_blank" rel="noopener" class="btn btn-outline btn-sm">Get started →</a>
+          </div>
+        </div>
+      </div>
+      <div class="player">
+        <div class="thumb" id="yt-facade" role="button" tabindex="0" aria-label="Play the Artifact Firewall walkthrough" onclick="loadYT()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();loadYT();}">
+          <img src="https://img.youtube.com/vi/ZbwXnT4jjuE/maxresdefault.jpg" alt="" onerror="this.src='https://img.youtube.com/vi/ZbwXnT4jjuE/hqdefault.jpg'">
+          <div class="play">&#9658;</div>
+          <div class="cap">Artifact Firewall walkthrough</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- COMING FROM JFROG -->
+<section class="contrast strip" id="jfrog">
+  <div class="wrap">
+    <div class="section-head center">
+      <div class="eyebrow">Coming from JFrog</div>
+      <h2>Keep your registries. Drop the lock-in.</h2>
+      <p>Scanners flag risks after the download. To block at request time, JFrog now points you at Curation, a capability bound to its own platform. Artifact Firewall gives you that same request-time enforcement without adopting a platform to get it.</p>
+    </div>
+    <div class="vs">
+      <div class="vs-card locked">
+        <div class="vs-tag">The platform-locked path</div>
+        <h3>JFrog Curation</h3>
+        <ul class="vs-list">
+          <li><span class="mk">!</span><span class="confirm">Request-time blocking is moving out of Xray and into Curation through 2026.</span></li>
+          <li><span class="mk">!</span><span class="confirm">Runs only on the JFrog platform: Artifactory, Xray, and the Catalog service.</span></li>
+          <li><span class="mk">!</span><span class="confirm">Registry, scanner, and policy gate all come from, and bill through, one vendor.</span></li>
+        </ul>
+      </div>
+      <div class="vs-card neutral">
+        <div class="vs-tag">The vendor-neutral path</div>
+        <h3>Varnish Artifact Firewall</h3>
+        <ul class="vs-list">
+          <li><span class="mk">✓</span><span><strong>Request-time enforcement</strong> as a standalone layer, no platform to adopt.</span></li>
+          <li><span class="mk">✓</span><span><strong>Sits in front of Artifactory, Nexus,</strong> or whatever registries you already run.</span></li>
+          <li><span class="mk">✓</span><span><strong>Keep your stack.</strong> Add enforcement in the path, with no rip-and-replace.</span></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA BAND -->
+<section class="ctaband" id="cta">
+  <div class="wrap">
+    <div class="eyebrow" style="color:var(--blue-30);">Get started</div>
+    <h2>See it on your stack</h2>
+    <p>Book a working session with our team to walk through your registries, your policy needs, and where request-time enforcement fits.</p>
+    <div class="btn-row">
+      <a href="#" class="btn btn-primary">Book a meeting</a>
+      <a href="#walkthrough" class="btn btn-outline">Watch the walkthrough</a>
+    </div>
+  </div>
+</section>
+
+<!-- HELP -->
+<section class="help">
+  <div class="wrap">
+    <div class="section-head">
+      <div class="eyebrow">Resources</div>
+      <h2>Need help getting started?</h2>
+      <p>Our team is ready and available for questions.</p>
+    </div>
+    <div class="links">
+      <a class="linkcard" href="https://www.varnish-software.com/orca/docs/tutorials/" target="_blank" rel="noopener">
+        <strong>Tutorials &amp; docs <span class="arr">→</span></strong>
+        <span>Step-by-step guides on varnish-software.com</span>
+      </a>
+      <a class="linkcard" href="https://github.com/varnish/orca" target="_blank" rel="noopener">
+        <strong>GitHub <span class="arr">→</span></strong>
+        <span>Source, issues, and releases</span>
+      </a>
+      <a class="linkcard" href="https://discord.gg/sZs6NuPgk" target="_blank" rel="noopener">
+        <strong>Discord <span class="arr">→</span></strong>
+        <span>Join the community (#orca)</span>
+      </a>
+      <a class="linkcard" href="mailto:orca@varnish-software.com">
+        <strong>Reach out directly <span class="arr">→</span></strong>
+        <span>orca@varnish-software.com</span>
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="wrap">
+    <div class="brand">
+      <span class="mark"><span></span><span></span><span></span></span>
+      Varnish
+      <span class="divider" style="background:rgba(255,255,255,.2);"></span>
+      <span class="suffix">Artifact Firewall</span>
+    </div>
+    <div class="tagline">Built on Varnish, the proxy infrastructure of the open internet · © 2026</div>
+  </div>
+</footer>
+
+<script>
+function loadYT(){
+  var f=document.getElementById('yt-facade');
+  if(!f||f.dataset.loaded)return;
+  f.dataset.loaded='1';
+  f.innerHTML='<iframe src="https://www.youtube-nocookie.com/embed/ZbwXnT4jjuE?autoplay=1&rel=0" title="Varnish Artifact Firewall walkthrough" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>';
+}
+</script>
+</body>
+</html>
