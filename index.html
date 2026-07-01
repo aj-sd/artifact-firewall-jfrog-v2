@@ -1,4 +1,4 @@
-!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -117,20 +117,18 @@
   /* yellow confirm highlight — claims pending product-owner sign-off */
   .confirm{background:#FFF3C4;box-shadow:0 0 0 2px #FFF3C4;border-radius:2px;}
 
-  /* actions triad — block / quarantine / serve */
+  /* actions grid — block / hide / quarantine / serve */
   .triad{background:#fff;}
-  .triad-grid{display:grid;grid-template-columns:1fr 1.3fr;gap:64px;align-items:center;}
-  .triad .stat{font-family:var(--serif);font-size:96px;line-height:.9;color:var(--ink);font-weight:500;letter-spacing:-.03em;}
-  .triad .stat-cap{font-size:16px;color:var(--gray-70);margin-top:14px;max-width:280px;}
-  .actions{list-style:none;margin:0;padding:0;border-left:1px solid var(--line);}
-  .actions li{display:flex;align-items:flex-start;gap:16px;padding:0 0 26px 28px;}
-  .actions li:last-child{padding-bottom:0;}
-  .actions .badge{flex:none;width:40px;height:40px;border-radius:10px;display:flex;align-items:center;
-    justify-content:center;background:var(--blue-10);color:var(--blue-60);}
-  .actions .badge svg{width:20px;height:20px;}
+  .actions{list-style:none;margin:8px 0 0;padding:0;display:grid;grid-template-columns:repeat(4,1fr);gap:32px;}
+  .actions li{display:block;padding:0;}
+  .actions .badge{width:44px;height:44px;border-radius:11px;display:flex;align-items:center;
+    justify-content:center;background:var(--blue-10);color:var(--blue-60);margin-bottom:16px;}
+  .actions .badge svg{width:22px;height:22px;}
   .actions .label{font-family:var(--mono);font-size:12px;letter-spacing:1.5px;text-transform:uppercase;color:var(--blue-60);}
-  .actions .what{color:var(--ink);font-weight:700;font-size:17px;margin-top:2px;}
-  .actions .desc{color:var(--gray-70);font-size:14.5px;margin-top:3px;}
+  .actions .what{color:var(--ink);font-weight:700;font-size:17px;margin-top:3px;}
+  .actions .desc{color:var(--gray-70);font-size:14.5px;line-height:1.55;margin-top:8px;}
+  @media(max-width:900px){.actions{grid-template-columns:1fr 1fr;gap:30px 28px;}}
+  @media(max-width:680px){.actions{grid-template-columns:1fr;}}
 
   /* neutrality meta line in hero */
   .neutral-line{font-family:var(--mono);font-size:12.5px;color:var(--muted);letter-spacing:.3px;margin:14px 0 0;}
@@ -329,11 +327,6 @@
       <h2>Block the known. Quarantine the unknown.</h2>
       <p>Scanners like JFrog Xray only catch vulnerabilities after dependencies are pulled in, by which point it is too late. Artifact Firewall enforces policy the moment a package is requested, stopping malware and vulnerable versions before they are installed, across npm, PyPI, Maven, and NuGet.</p>
     </div>
-    <div class="triad-grid">
-      <div>
-        <div class="stat">100%</div>
-        <div class="stat-cap">of classified package requests evaluated before they are served</div>
-      </div>
       <ul class="actions">
         <li>
           <span class="badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/></svg></span>
@@ -352,7 +345,6 @@
           <div><div class="label">Serve</div><div class="what">Approved packages</div><div class="desc">Pass approved versions straight through, so builds resolve to a safe release.</div></div>
         </li>
       </ul>
-    </div>
     <div class="bgrid" style="margin-top:56px;">
       <div class="benefit">
         <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg></div>
@@ -378,8 +370,8 @@
     <div class="pill-group">
       <div class="glabel">Repository managers</div>
       <div class="pills">
-        <span class="pill key">JFrog Artifactory</span>
-        <span class="pill key">Sonatype Nexus</span>
+        <span class="pill">JFrog Artifactory</span>
+        <span class="pill">Sonatype Nexus</span>
         <span class="pill">Cloudsmith</span>
         <span class="pill">GitHub Packages</span>
         <span class="pill">GitLab Package Registry</span>
